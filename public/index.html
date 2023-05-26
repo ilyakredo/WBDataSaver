@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>WB-DataSaver</title>
+  </head>
+  <body>
+    <div class="contentWrapper">
+      <h1>WB-DataSaver</h1>
+      <p>Файл загрузки: Excel файл в формате .xlsx</p>
+      <p>
+        ВАЖНО! Перед загрузкой убедитесь что в excel файле один столбец -
+        <span>Артикул продавца</span>.
+      </p>
+      <p>
+        После завершения обработки, вы сможете скачать файл с замененными
+        ссылками на изображения в формате excel.
+      </p>
+
+      <form enctype="multipart/form-data">
+        <input name="excelFile" type="file" />
+        <button class="loadBtn" type="submit">ЗАГРУЗИТЬ ДАННЫЕ</button>
+      </form>
+      <div class="resultWrapper"></div>
+      <div class="footer">WB-DataSaver-v1.0</div>
+    </div>
+    <script>
+      const form = document.querySelector("form");
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const form = document.querySelector("form");
+        const loadBtn = document.querySelector(".loadBtn");
+        const resultWrapper = document.querySelector(".resultWrapper");
+        loadBtn.setAttribute("Disabled", true);
+        const fileInput = document.querySelector("input[type='file']");
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        const dataLoadDiv = document.createElement("div");
+        dataLoadDiv.setAttribute("class", "data-load");
+        dataLoadDiv.innerHTML =
+          '<h2>ЗАГРУЗКА ДАННЫХ ...</h2><div class="loader">loading</div>';
+        resultWrapper.innerHTML = "";
+        resultWrapper.appendChild(dataLoadDiv);
+
+        formData.append("excelFile", file);
+        fetch("/load_file", {
+          method: "POST",
+          body: formData,
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            form.reset();
+            loadBtn.removeAttribute("Disabled");
+            resultWrapper.innerHTML = "";
+            const downloadBtn = document.createElement("button");
+            const processFinishMsg = document.createElement("p");
+            processFinishMsg.textContent =
+              "ОБРАБОТКА ЗАКОНЧЕНА. ВЫ МОЖЕТЕ СКАЧАТЬ ФАЙЛ С РЕЗУЛЬТАТАМИ.";
+            downloadBtn.textContent = "СКАЧАТЬ РЕЗУЛЬТАТЫ";
+            downloadBtn.classList.add("downloadBtn");
+            resultWrapper.appendChild(processFinishMsg);
+            resultWrapper.appendChild(downloadBtn);
+            downloadBtn.addEventListener("click", () => {
+              fetch("/download_results", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+              })
+                .then((res) => {
+                  return res.json();
+                })
+                .then((obj) => {
+                  const messPar = document.createElement("p");
+                  const saveResDiv = document.createElement("div");
+                  saveResDiv.classList.add("save-results");
+                  messPar.textContent = obj.message;
+                  messPar.classList.add("saveFilePar");
+                  saveResDiv.appendChild(messPar);
+                  resultWrapper.appendChild(saveResDiv);
+                  setTimeout(() => {
+                    saveResDiv.remove();
+                  }, 2000);
+                });
+            });
+            // console.log(data);
+          });
+      });
+    </script>
+  </body>
+</html>
