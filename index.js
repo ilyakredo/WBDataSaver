@@ -48,7 +48,10 @@ app.post("/load_file", upload.single("excelFile"), async (req, res) => {
   const jsonData = XLSX.utils.sheet_to_json(workSheet);
   jsonData.forEach((dataItem) => {
     imageUrls.push(dataItem["Медиафайлы"].split(";"));
-    itemsIds.push(dataItem["Артикул продавца"]);
+    const validId = dataItem["Артикул продавца"]
+      .toString()
+      .replace(/[^a-zA-Zа-яА-Я0-9]/g, "");
+    itemsIds.push(validId);
   });
   const fbUrlsArr = await imageProcess(imageUrls, itemsIds);
   for (let ind = 0; ind < jsonData.length; ind++) {
@@ -89,6 +92,7 @@ app.listen(PORT, () => {
 const imageProcess = async (imgArr, idArr) => {
   let itemsQtt = Number(imgArr.length);
   const resultUrlArr = [];
+  console.log(`--DATA LOADING STARTED--`);
   for (let ind = 0; ind < imgArr.length; ind++) {
     console.log(`Items left - ${itemsQtt--}`);
     if (imgArr[ind]) {
@@ -100,29 +104,51 @@ const imageProcess = async (imgArr, idArr) => {
           if (count > 0) {
             fileName = `${idArr[ind]}-${count}`;
           }
-          fs.writeFileSync(
-            `public/tmp-img/${fileName}.jpg`,
-            await download(imageUrl)
-          );
-          count++;
-          const fbFileUrl = await uploadFirebase(fileName);
-          if (fbFileUrl) {
-            fbUrlArr.push(fbFileUrl);
-          } else {
-            fbUrlArr.push("");
+          try {
+            fs.writeFileSync(
+              `public/tmp-img/${fileName}.jpg`,
+              await download(imageUrl)
+            );
+          } catch (err) {
+            console.log(
+              "Could not download the file, maybe file doesn't exist"
+            );
+            continue;
           }
+          try {
+            const fbFileUrl = await uploadFirebase(fileName);
+            if (fbFileUrl) {
+              fbUrlArr.push(fbFileUrl);
+            } else {
+              fbUrlArr.push("");
+            }
+          } catch (err) {
+            console.log("Could not load file to storage");
+            continue;
+          }
+          count++;
         }
         resultUrlArr.push(fbUrlArr);
       } else {
-        fs.writeFileSync(
-          `public/tmp-img/${fileName}.jpg`,
-          await download(imgArr[ind][0])
-        );
-        const fbFileUrl = await uploadFirebase(fileName);
-        if (fbFileUrl) {
-          resultUrlArr.push([fbFileUrl]);
-        } else {
-          resultUrlArr.push([]);
+        try {
+          fs.writeFileSync(
+            `public/tmp-img/${fileName}.jpg`,
+            await download(imgArr[ind][0])
+          );
+        } catch (err) {
+          console.log("Could not download the file, maybe file doesn't exist");
+          continue;
+        }
+        try {
+          const fbFileUrl = await uploadFirebase(fileName);
+          if (fbFileUrl) {
+            resultUrlArr.push([fbFileUrl]);
+          } else {
+            resultUrlArr.push([]);
+          }
+        } catch (err) {
+          console.log("Could not load file to storage");
+          continue;
         }
       }
     } else {
@@ -130,6 +156,7 @@ const imageProcess = async (imgArr, idArr) => {
     }
     console.log("-------------------------");
   }
+  console.log(`--DATA LOADING FINISHED--`);
   return resultUrlArr;
 };
 
